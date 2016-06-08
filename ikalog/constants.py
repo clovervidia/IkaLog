@@ -47,15 +47,17 @@ rules = {
 }
 
 weapons = {
-    '52gal': {'ja': 'ガロン52', 'en': '.52 Gal'},
-    '52gal_deco': {'ja': 'ガロンデコ52', 'en': '.52 Gal Deco'},
-    '96gal': {'ja': 'ガロン96', 'en': '.96 Gal'},
-    '96gal_deco': {'ja': 'ガロンデコ96', 'en': '.96 Gal Deco'},
+    '52gal': {'ja': '.52ガロン', 'en': '.52 Gal'},
+    '52gal_deco': {'ja': '.52ガロンデコ', 'en': '.52 Gal Deco'},
+    '96gal': {'ja': '.96ガロン', 'en': '.96 Gal'},
+    '96gal_deco': {'ja': '.96ガロンデコ', 'en': '.96 Gal Deco'},
     'bold': {'ja': 'ボールドマーカー', 'en': 'Sploosh-o-matic'},
+    'bold_7': {'ja': 'ボールドマーカー7', 'en': 'Sploosh-o-matic 7'},
     'bold_neo': {'ja': 'ボールドマーカーネオ', 'en': 'Neo Sploosh-o-matic'},
     'dualsweeper': {'ja': 'デュアルスイーパー', 'en': 'Dual Squelcher'},
     'dualsweeper_custom': {'ja': 'デュアルスイーパーカスタム', 'en': 'Custom Dual Squelcher'},
     'h3reelgun': {'ja': 'H3リールガン', 'en': 'H-3 Nozzlenose'},
+    'h3reelgun_cherry': {'ja': 'H3リールガンチェリー', 'en': 'Cherry H-3 Nozzlenose'},
     'h3reelgun_d': {'ja': 'H3リールガンD', 'en': 'H-3 Nozzlenose D'},
     'heroshooter_replica': {'ja': 'ヒーローシューターレプリカ', 'en': 'Hero Shot Replica'},
     'hotblaster': {'ja': 'ホットブラスター', 'en': 'Blaster'},
@@ -66,15 +68,19 @@ weapons = {
     'l3reelgun_d': {'ja': 'L3リールガンD', 'en': 'L-3 Nozzlenose D'},
     'longblaster': {'ja': 'ロングブラスター', 'en': 'Range Blaster'},
     'longblaster_custom': {'ja': 'ロングブラスターカスタム', 'en': 'Custom Range laster'},
+    'longblaster_necro': {'ja': 'ロングブラスターネクロ', 'en': 'Grim Range laster'},
     'momiji': {'ja': 'もみじシューター', 'en': 'Custom Splattershot Jr.'},
     'nova': {'ja': 'ノヴァブラスター', 'en': 'Luna Blaster'},
     'nova_neo': {'ja': 'ノヴァブラスターネオ', 'en': 'Luna Blaster Neo'},
+    'nzap83': {'ja': 'N-ZAP83', 'en': 'N-ZAP \'83'},
     'nzap85': {'ja': 'N-ZAP85', 'en': 'N-ZAP \'85'},
     'nzap89': {'ja': 'N-ZAP89', 'en': 'N-Zap \'89'},
     'octoshooter_replica': {'ja': 'オクタシューターレプリカ', 'en': 'Octoshot Replica'},
     'prime': {'ja': 'プライムシューター', 'en': 'Splattershot Pro'},
+    'prime_berry': {'ja': 'プライムシューターベリー', 'en': 'Berry Splattershot Pro'},
     'prime_collabo': {'ja': 'プライムシューターコラボ', 'en': 'Forge Splattershot Pro'},
     'promodeler_mg': {'ja': 'プロモデラーMG', 'en': 'Aerospray MG'},
+    'promodeler_pg': {'ja': 'プロモデラーPG', 'en': 'Aerospray PG'},
     'promodeler_rg': {'ja': 'プロモデラーRG', 'en': 'Aerospray RG'},
     'rapid': {'ja': 'ラピッドブラスター', 'en': 'Rapid Blaster'},
     'rapid_deco': {'ja': 'ラピッドブラスターデコ', 'en': 'Rapid Blaster Deco'},
@@ -84,36 +90,45 @@ weapons = {
     'sharp_neo': {'ja': 'シャープマーカーネオ', 'en': 'Neo Splash-o-matic'},
     'sshooter': {'ja': 'スプラシューター', 'en': 'Splattershot'},
     'sshooter_collabo': {'ja': 'スプラシューターコラボ', 'en': 'Tentatek Splattershot'},
+    'sshooter_wasabi': {'ja': 'スプラシューターワサビ', 'en': 'Wasabi Splattershot'},
     'wakaba': {'ja': 'わかばシューター', 'en': 'Splattershot Jr.'},
 
     'carbon': {'ja': 'カーボンローラー', 'en': 'Carbon Roller'},
     'carbon_deco': {'ja': 'カーボンローラーデコ', 'en': 'Carbon Roller Deco'},
     'dynamo': {'ja': 'ダイナモローラー', 'en': 'Dynamo Roller'},
+    'dynamo_burned': {'ja': 'ダイナモローラーバーンド', 'en': 'Tempered Dynamo Roller'},
     'dynamo_tesla': {'ja': 'ダイナモローラーテスラ', 'en': 'Gold Dynamo Roller'},
     'heroroller_replica': {'ja': 'ヒーローローラーレプリカ', 'en': 'Hero Roller Replica'},
     'hokusai': {'ja': 'ホクサイ', 'en': 'Octobrush'},
     'hokusai_hue': {'ja': 'ホクサイ・ヒュー', 'en': 'Octobrush Nouveau'},
     'pablo': {'ja': 'パブロ', 'en': 'Inkbrush'},
     'pablo_hue': {'ja': 'パブロ・ヒュー', 'en': 'Inkbrush Nouveau'},
+    'pablo_permanent': {'ja': 'パーマネント・パブロ', 'en': 'Permanent Inkbrush'},
     'splatroller': {'ja': 'スプラローラー', 'en': 'Splat Roller'},
     'splatroller_collabo': {'ja': 'スプラローラーコラボ', 'en': 'Krak-On Splat Roller'},
+    'splatroller_corocoro': {'ja': 'スプラローラーコロコロ', 'en': 'CoroCoro Splat Roller'},
 
     'bamboo14mk1': {'ja': '14式竹筒銃・甲', 'en': 'Bamboozler 14 MK I'},
     'bamboo14mk2': {'ja': '14式竹筒銃・乙', 'en': 'Bamboozler 14 MK II'},
+    'bamboo14mk3': {'ja': '14式竹筒銃・丙', 'en': 'Bamboozler 14 Mk III'},
     'herocharger_replica': {'ja': 'ヒーローチャージャーレプリカ', 'en': 'Hero Charger Replica'},
     'liter3k': {'ja': 'リッター3K', 'en': 'E-liter 3K'},
     'liter3k_custom': {'ja': 'リッター3Kカスタム', 'en': 'Custom E-liter 3K'},
     'liter3k_scope': {'ja': '3Kスコープ', 'en': 'E-liter 3K Scope'},
     'liter3k_scope_custom': {'ja': '3Kスコープカスタム', 'en': 'Custom E-liter 3K Scope'},
     'splatcharger': {'ja': 'スプラチャージャー', 'en': 'Splat Charger'},
+    'splatcharger_bento': {'ja': 'スプラチャージャーベントー', 'en': 'Bento Splat Charger'},
     'splatcharger_wakame': {'ja': 'スプラチャージャーワカメ', 'en': 'Kelp Splat Charger'},
     'splatscope': {'ja': 'スプラスコープ', 'en': 'Splatterscope'},
+    'splatscope_bento': {'ja': 'スプラスコープベントー', 'en': 'Bento Splatterscope'},
     'splatscope_wakame': {'ja': 'スプラスコープワカメ', 'en': 'Kelp Splatterscope'},
     'squiclean_a': {'ja': 'スクイックリンα', 'en': 'Classic Squiffer'},
     'squiclean_b': {'ja': 'スクイックリンβ', 'en': 'New Squiffer'},
+    'squiclean_g': {'ja': 'スクイックリンγ', 'en': 'Fresh Squiffer'},
 
     'bucketslosher': {'ja': 'バケットスロッシャー', 'en': 'Slosher'},
     'bucketslosher_deco': {'ja': 'バケットスロッシャーデコ', 'en': 'Slosher Deco'},
+    'bucketslosher_soda': {'ja': 'バケットスロッシャーソーダ', 'en': 'Soda Slosher'},
     'hissen': {'ja': 'ヒッセン', 'en': 'Tri-Slosher'},
     'hissen_hue': {'ja': 'ヒッセン・ヒュー', 'en': 'Tri-Slosher Nouveau'},
     'screwslosher': {'ja': 'スクリュースロッシャー', 'en': 'Sloshing Machine'},
@@ -121,10 +136,12 @@ weapons = {
 
     'barrelspinner': {'ja': 'バレルスピナー', 'en': 'Heavy Splatling'},
     'barrelspinner_deco': {'ja': 'バレルスピナーデコ', 'en': 'Heavy Splatling Deco'},
+    'barrelspinner_remix': {'ja': 'バレルスピナーリミックス', 'en': 'Heavy Splatling Remix'},
     'hydra': {'ja': 'ハイドラント', 'en': 'Hydra Splatling'},
     'hydra_custom': {'ja': 'ハイドラントカスタム', 'en': 'Custom Hydra Splatling'},
     'splatspinner': {'ja': 'スプラスピナー', 'en': 'Mini Splatling'},
     'splatspinner_collabo': {'ja': 'スプラスピナーコラボ', 'en': 'Zink Mini Splatling'},
+    'splatspinner_repair': {'ja': 'スプラスピナーリペア', 'en': 'Refurbished Mini Splatling'},
 }
 
 sub_weapons = {
@@ -228,6 +245,20 @@ gear_brands = {
     'zekko':      {'ja': 'エゾッコ', 'en': 'Zekko', },
     'zink':       {'ja': 'アイロニック', 'en': 'Zink', },
 }
+
+lobby_types = {
+    'festa':    {'ja': 'フェス', 'en': 'Splatfest'},
+    'private':  {'ja': 'プライベートマッチ', 'en': 'Private Battle'},
+    'public':   {'ja': '通常マッチ', 'en': 'Standard Battle'},
+    'tag':      {'ja': 'タッグマッチ', 'en': 'Squad Battle'},
+}
+
+#
+
+upcoming_weapons = [
+]
+
+#
 
 for ability in gear_abilities.keys():
     gear_abilities[ability]['id'] = ability

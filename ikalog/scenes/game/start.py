@@ -47,6 +47,7 @@ class GameStart(StatefulScene):
         self.rule_votes = []
 
         self._last_event_msec = - 100 * 1000
+        self._last_run_msec = - 100 * 1000
 
     def find_best_match(self, frame, matchers_list):
         most_possible = (0, None)
@@ -96,19 +97,25 @@ class GameStart(StatefulScene):
         if (timer_icon is not None) and timer_icon.matched_in(context, 3000):
             return False
 
+
         frame = context['engine']['frame']
 
         if frame is None:
             return False
 
+        if self.matched_in(context, 1500, attr='_last_run_msec'):
+            return False
+        else:
+            self._last_run_msec = context['engine']['msec']
+
         stage = self.find_best_match(frame, self.stage_matchers)
         rule = self.find_best_match(frame, self.rule_matchers)
 
         if not stage is None:
-            context['game']['map'] = stage
+            context['game']['map'] = stage.id_
 
         if not rule is None:
-            context['game']['rule'] = rule
+            context['game']['rule'] = rule.id_
 
         if stage or rule:
             self.stage_votes = []
@@ -143,8 +150,14 @@ class GameStart(StatefulScene):
         # それ以上マッチングしなかった場合 -> シーンを抜けている
 
         if not self.matched_in(context, 20000, attr='_last_event_msec'):
-            context['game']['map'] = self.elect(context, self.stage_votes)
-            context['game']['rule'] = self.elect(context, self.rule_votes)
+            context['game']['map'] = self.elect(context, self.stage_votes).id_
+            context['game']['rule'] = self.elect(context, self.rule_votes).id_
+
+            if not context['game']['start_time']:
+                # start_time should be initialized in GameGoSign.
+                # This is a fallback in case GameGoSign was skipped.
+                context['game']['start_time'] = IkaUtils.getTime(context)
+                context['game']['start_offset_msec'] = context['engine']['msec']
 
             self._call_plugins('on_game_start')
             self._last_event_msec = context['engine']['msec']
@@ -181,6 +194,7 @@ class GameStart(StatefulScene):
                 bg_method=matcher.MM_NOT_WHITE(),
                 fg_method=matcher.MM_WHITE(),
                 label='stage:%s' % stage_id,
+                call_plugins=self._call_plugins,
                 debug=debug,
             )
             self.stage_matchers.append(stage)
@@ -195,6 +209,7 @@ class GameStart(StatefulScene):
                 bg_method=matcher.MM_NOT_WHITE(),
                 fg_method=matcher.MM_WHITE(),
                 label='rule:%s' % rule_id,
+                call_plugins=self._call_plugins,
                 debug=debug,
             )
             setattr(rule, 'id_', rule_id)

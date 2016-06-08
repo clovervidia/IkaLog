@@ -31,12 +31,17 @@ from ikalog.utils import *
 class ObjectiveTracker(Scene):
     # 720p サイズでの値
     tower_width = 580
-    tower_left = 1280 / 2 - tower_width / 2
+    tower_left = int(1280 / 2 - tower_width / 2)
     tower_top = 78
     tower_height = 88
 
     tower_line_top = 93
     tower_line_height = 5
+
+    # Called per Engine's reset.
+    def reset(self):
+        super(ObjectiveTracker, self).reset()
+        self._last_update_msec = -100 * 1000
 
     def tower_pos(self, context):
         img = context['engine']['frame'][self.tower_line_top:self.tower_line_top +
@@ -56,11 +61,13 @@ class ObjectiveTracker(Scene):
 
         # 白い部分にいまヤグラ/ホコがある
         img3_hsv = cv2.cvtColor(img3, cv2.COLOR_BGR2HSV)
-        white_mask_s = cv2.inRange(img3_hsv[:, :, 1], 0, 8)
         white_mask_v = cv2.inRange(img3_hsv[:, :, 2], 248, 256)
-        white_mask = np.minimum(white_mask_s, white_mask_v)
         x_list = np.arange(self.tower_width)
-        tower_x = np.extract(white_mask[3, :] > 128, x_list)
+        tower_x = np.extract(white_mask_v[3, :] > 128, x_list)
+
+        if tower_x.shape[0] == 0:
+            return None
+
         tower_xPos = np.average(tower_x)
 
         # FixMe: マスクした関係が位置がずれている可能性があるので、適宜補正すべき
@@ -70,7 +77,7 @@ class ObjectiveTracker(Scene):
 
         # あきらかにおかしい値が出たらとりあえず排除
         if xPos_pct < -120 or 120 < xPos_pct:
-            xPos_pct = Nan
+            xPos_pct = None
 
         return xPos_pct
 
@@ -79,12 +86,12 @@ class ObjectiveTracker(Scene):
             return False
 
         if context['game']['rule'] is None:
-            return None
+            return False
 
-        rule_id = IkaUtils.rule2id(context['game']['rule'])
+        rule_id = context['game']['rule']
         applicable_modes = ['yagura', 'hoko']
         if not (rule_id in applicable_modes):
-            return None
+            return False
 
         xPos_pct = self.tower_pos(context)
 
@@ -95,7 +102,7 @@ class ObjectiveTracker(Scene):
                 'min': 0,
             }
 
-        if xPos_pct != xPos_pct:
+        if xPos_pct is None:
             # 値がとれていない
             xPos_pct = context['game']['tower']['pos']
 
@@ -119,11 +126,11 @@ class ObjectiveTracker(Scene):
         self._last_update_msec = context['engine']['msec']
         return True
 
+    # Called only once on initialization.
     def _init_scene(self):
         self.ui_tower_mask = imread('masks/ui_tower.png')
         self.ui_tower_mask = self.ui_tower_mask[
             self.tower_line_top:self.tower_line_top + self.tower_line_height, self.tower_left:self.tower_left + self.tower_width]
-        self._last_update_msec = -100 * 1000
 
 if __name__ == "__main__":
     target = cv2.imread(sys.argv[1])

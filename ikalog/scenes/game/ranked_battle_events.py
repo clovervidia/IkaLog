@@ -27,12 +27,14 @@ from ikalog.scenes.stateful_scene import StatefulScene
 
 class GameRankedBattleEvents(StatefulScene):
 
+    # Called per Engine's reset.
     def reset(self):
         super(GameRankedBattleEvents, self).reset()
 
         self._last_event_msec = - 100 * 1000
         self._last_mask_matched = None
         self._last_mask_triggered_msec = - 100 * 1000
+        self._masks_active = {}
 
     def find_best_match(self, frame, matchers_list):
         most_possible = (0, None)
@@ -48,7 +50,7 @@ class GameRankedBattleEvents(StatefulScene):
         self._masks_active = {}
 
     def on_game_start(self, context):
-        rule_id = IkaUtils.rule2id(context['game']['rule'])
+        rule_id = context['game']['rule']
         if rule_id == 'area':
             self._masks_active = self._masks_splatzone.copy()
             self._masks_active.update(self._masks_ranked)
@@ -140,6 +142,7 @@ class GameRankedBattleEvents(StatefulScene):
             label='splatzone/we_got',
             bg_method=matcher.MM_NOT_WHITE(),
             fg_method=matcher.MM_WHITE(),
+            call_plugins=self._call_plugins,
             debug=debug,
         )
 
@@ -151,6 +154,7 @@ class GameRankedBattleEvents(StatefulScene):
             label='splatzone/we_lost',
             bg_method=matcher.MM_NOT_WHITE(),
             fg_method=matcher.MM_WHITE(),
+            call_plugins=self._call_plugins,
             debug=debug,
         )
 
@@ -162,6 +166,7 @@ class GameRankedBattleEvents(StatefulScene):
             label='splatzone/they_got',
             bg_method=matcher.MM_NOT_WHITE(),
             fg_method=matcher.MM_WHITE(),
+            call_plugins=self._call_plugins,
             debug=debug,
         )
 
@@ -173,6 +178,7 @@ class GameRankedBattleEvents(StatefulScene):
             label='splatzone/they_lost',
             bg_method=matcher.MM_NOT_WHITE(),
             fg_method=matcher.MM_WHITE(),
+            call_plugins=self._call_plugins,
             debug=debug,
         )
 
@@ -192,6 +198,7 @@ class GameRankedBattleEvents(StatefulScene):
             label='rainmaker/we_got',
             bg_method=matcher.MM_NOT_WHITE(),
             fg_method=matcher.MM_WHITE(),
+            call_plugins=self._call_plugins,
             debug=debug,
         )
 
@@ -203,6 +210,7 @@ class GameRankedBattleEvents(StatefulScene):
             label='rainmaker/we_lost',
             bg_method=matcher.MM_NOT_WHITE(),
             fg_method=matcher.MM_WHITE(),
+            call_plugins=self._call_plugins,
             debug=debug,
         )
 
@@ -214,6 +222,7 @@ class GameRankedBattleEvents(StatefulScene):
             label='rainmaker/they_got',
             bg_method=matcher.MM_NOT_WHITE(),
             fg_method=matcher.MM_WHITE(),
+            call_plugins=self._call_plugins,
             debug=debug,
         )
 
@@ -225,6 +234,7 @@ class GameRankedBattleEvents(StatefulScene):
             label='rainmaker/they_lost',
             bg_method=matcher.MM_NOT_WHITE(),
             fg_method=matcher.MM_WHITE(),
+            call_plugins=self._call_plugins,
             debug=debug,
         )
 
@@ -244,6 +254,7 @@ class GameRankedBattleEvents(StatefulScene):
             label='towercontrol/we_took',
             bg_method=matcher.MM_NOT_WHITE(),
             fg_method=matcher.MM_WHITE(),
+            call_plugins=self._call_plugins,
             debug=debug,
         )
 
@@ -255,6 +266,7 @@ class GameRankedBattleEvents(StatefulScene):
             label='towercontrol/we_lost',
             bg_method=matcher.MM_NOT_WHITE(),
             fg_method=matcher.MM_WHITE(),
+            call_plugins=self._call_plugins,
             debug=debug,
         )
 
@@ -266,6 +278,7 @@ class GameRankedBattleEvents(StatefulScene):
             label='towercontrol/they_took',
             bg_method=matcher.MM_NOT_WHITE(),
             fg_method=matcher.MM_WHITE(),
+            call_plugins=self._call_plugins,
             debug=debug,
         )
 
@@ -277,6 +290,7 @@ class GameRankedBattleEvents(StatefulScene):
             label='towercontrol/they_lost',
             bg_method=matcher.MM_NOT_WHITE(),
             fg_method=matcher.MM_WHITE(),
+            call_plugins=self._call_plugins,
             debug=debug,
         )
 
@@ -287,8 +301,8 @@ class GameRankedBattleEvents(StatefulScene):
             mask_they_lost: 'on_game_towercontrol_they_lost',
         }
 
+    # Called only once on initialization.
     def _init_scene(self, debug=False):
-        self._masks_active = {}
         self._load_rainmaker_masks(debug=debug)
         self._load_splatzone_masks(debug=debug)
         self._load_towercontrol_masks(debug=debug)
@@ -301,6 +315,7 @@ class GameRankedBattleEvents(StatefulScene):
             label='splatzone/we_lead',
             bg_method=matcher.MM_NOT_WHITE(),
             fg_method=matcher.MM_WHITE(),
+            call_plugins=self._call_plugins,
             debug=debug,
         )
 
@@ -312,6 +327,7 @@ class GameRankedBattleEvents(StatefulScene):
             label='splatzone/they_lead',
             bg_method=matcher.MM_NOT_WHITE(),
             fg_method=matcher.MM_WHITE(),
+            call_plugins=self._call_plugins,
             debug=debug,
         )
 

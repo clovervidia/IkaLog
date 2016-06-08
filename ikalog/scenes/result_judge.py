@@ -54,21 +54,21 @@ class ResultJudge(Scene):
         img_bar = context['engine']['frame'][600:600 + 30, 126:126 + 1028, :]
         img_bar_hsv = cv2.cvtColor(img_bar, cv2.COLOR_BGR2HSV)
         ret, img_bar_b = cv2.threshold(
-            img_bar_hsv[:, :, 2], 96, 255, cv2.THRESH_BINARY)
+            img_bar_hsv[:, :, 2], 48, 255, cv2.THRESH_BINARY)
 
         img_bar_b_hist = cv2.calcHist([img_bar_b], [0], None, [3], [0, 256])
-        raito = img_bar_b_hist[2] / np.sum(img_bar_b_hist)
-        #print('%s: win %s lose %s raito %s' % (self, match_win, match_lose, raito))
+        ratio = img_bar_b_hist[2] / np.sum(img_bar_b_hist)
 
-        if (raito < 0.9):
+        # print('%s: win %s lose %s ratio %s' % (self, match_win, match_lose, ratio))
+
+        if (ratio < 0.9):
             return False
 
         context['game']['judge'] = 'win' if match_win else 'lose'
 
         if not self.matched_in(context, 30 * 1000, attr='_last_event_msec'):
-            print('trigger event')
-            context['game']['image_judge'] = copy.deepcopy(
-                context['engine']['frame'])
+            context['game']['image_judge'] = \
+                copy.deepcopy(context['engine']['frame'])
             self._analyze(context)
             self._call_plugins('on_result_judge')
             self._last_event_msec = context['engine']['msec']
@@ -109,6 +109,7 @@ class ResultJudge(Scene):
             bg_method=matcher.MM_NOT_WHITE(),
             fg_method=matcher.MM_WHITE(),
             label='result_judge/win',
+            call_plugins=self._call_plugins,
             debug=debug,
         )
 
@@ -120,6 +121,7 @@ class ResultJudge(Scene):
             bg_method=matcher.MM_NOT_WHITE(),
             fg_method=matcher.MM_WHITE(),
             label='result_judge/win_ko',
+            call_plugins=self._call_plugins,
             debug=debug,
         )
 
@@ -131,6 +133,7 @@ class ResultJudge(Scene):
             bg_method=matcher.MM_NOT_WHITE(),
             fg_method=matcher.MM_WHITE(),
             label='result_judge/lose',
+            call_plugins=self._call_plugins,
             debug=debug,
         )
 
@@ -142,6 +145,7 @@ class ResultJudge(Scene):
             bg_method=matcher.MM_NOT_WHITE(),
             fg_method=matcher.MM_WHITE(),
             label='result_judge/lose_ko',
+            call_plugins=self._call_plugins,
             debug=debug,
         )
 

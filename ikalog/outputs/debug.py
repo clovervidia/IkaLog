@@ -53,6 +53,9 @@ class DebugLog(object):
     def on_game_killed(self, context):
         self.write_debug_log(sys._getframe().f_code.co_name, context)
 
+    def on_game_chained_kill_combo(self, context):
+        self.write_debug_log(sys._getframe().f_code.co_name, context)
+
     def on_game_dead(self, context):
         self.write_debug_log(sys._getframe().f_code.co_name, context)
 
@@ -212,6 +215,12 @@ class DebugLog(object):
         s = "death_reasons = %s" % (context['game']['death_reasons'])
         self.write_debug_log(sys._getframe().f_code.co_name, context, text=s)
 
+    def on_game_session_abort(self, context):
+        self.write_debug_log(sys._getframe().f_code.co_name, context)
+
+    def on_game_lost_sync(self, context):
+        self.write_debug_log(sys._getframe().f_code.co_name, context)
+
     # Inkopolis
 
     def on_inkopolis_lottery_done(self, context):
@@ -221,6 +230,18 @@ class DebugLog(object):
             context['game']['downie']['sub_abilities']
         )
         self.write_debug_log(sys._getframe().f_code.co_name, context, text=s)
+
+    # output: stat.ink
+    def on_output_statink_submission_done(self, context, params={}):
+        s = "url = %s" % params.get('url', None)
+        self.write_debug_log(sys._getframe().f_code.co_name, context, text=s)
+
+    def on_output_statink_submission_error(self, context, params={}):
+        s = "url = %s" % params.get('url', None)
+        self.write_debug_log(sys._getframe().f_code.co_name, context)
+
+    def on_output_statink_submission_dryrun(self, context, params={}):
+        self.write_debug_log(sys._getframe().f_code.co_name, context)
 
     # UI support
 
