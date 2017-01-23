@@ -28,7 +28,7 @@ import time
 import traceback
 
 from ikalog.utils import *
-from . import scenes
+from .scenes.v1 import initialize_scenes
 
 # The IkaLog core engine.
 #
@@ -75,7 +75,24 @@ class IkaEngine:
             'text': text,
         }
 
-    #
+    # services
+
+    def set_service(self, service_identifier, obj):
+        """
+        Register a service.
+        Plugins can publish functions (or objects) to other plugins, as a service.
+        """
+        assert not service_identifier in self._services
+        self._services[service_identifier] = obj
+
+    def get_service(self, service_identifier, default=None):
+        """
+        Lookup and return the service registered.
+        return None (or caller-specified value) if the identifier is not registered.
+        """
+        return self._services.get(service_identifier, default)
+
+    # game event handlers
 
     def on_game_individual_result(self, context):
         self.session_close_wdt = context['engine']['msec'] + (20 * 1000)
@@ -152,6 +169,7 @@ class IkaEngine:
         context['engine']['msec'] = t
         context['engine']['frame'] = frame
         context['engine']['preview'] = copy.deepcopy(frame)
+        context['game']['offset_msec'] = IkaUtils.get_game_offset_msec(context)
 
         self.call_plugins('on_debug_read_next_frame')
 
@@ -164,6 +182,9 @@ class IkaEngine:
 
     def is_stopped(self):
         return self._stop
+
+    def is_paused(self):
+        return self._pause
 
     def reset(self):
         index = 0
@@ -190,6 +211,11 @@ class IkaEngine:
 
             'inkling_state': [None, None],
 
+            # Dict mapping from event_name (e.g. objective) to lists of lists
+            # of msec time and value.
+            # e.g. 'events': {'objective': [[0, 0], [320, 99]]}
+            'events': {},
+
             # Float values of start and end times scince the epoch in second.
             # They are used with IkaUtils.GetTime.
             'start_time': None,
@@ -198,11 +224,14 @@ class IkaEngine:
             # They are used with context['engine']['msec']
             'start_offset_msec': None,
             'end_offset_msec': None,
+            # Time from start_offset_msec in msec.
+            'offset_msec': None,
         }
         self.call_plugins('on_game_reset')
         self._exception_log_init(self.context)
 
     def create_context(self):
+        prev_context = self.context
         self.context = {
             'engine': {
                 'engine': self,
@@ -221,8 +250,8 @@ class IkaEngine:
             },
             'scenes': {
             },
-            'config': {
-            },
+            # config should be nonvolatite.
+            'config': prev_context.get('config', {}),
             'lobby': {
             }
         }
@@ -257,6 +286,10 @@ class IkaEngine:
 
     def process_scene(self, scene):
         context = self.context
+
+        # If input, don't run the scene
+        if context['engine'].get('frame') is None:
+            return False
 
         try:
             scene.new_frame(context)
@@ -327,11 +360,27 @@ class IkaEngine:
             event = self._event_queue.pop(0)
             self.call_plugins(event_name=event[0], params=event[1], context=event[2])
 
+    def put_source_file(self, file_path):
+        return self.capture.put_source_file(file_path)
+
     def _main_loop(self):
+        need_reset_capture = False
         while not self._stop:
             if self._pause:
                 time.sleep(0.5)
                 continue
+
+            if not self.capture.is_active():
+                need_reset_capture = True
+                if self._keep_alive:
+                    time.sleep(0.5)
+                else:
+                    self.stop()
+                continue
+
+            if need_reset_capture:
+                self.reset_capture()
+                need_reset_capture = False
 
             try:
                 self.process_frame()
@@ -346,8 +395,10 @@ class IkaEngine:
 
                 if self.capture.on_eof():
                     self.reset_capture()
+                elif self._keep_alive:
+                    continue
                 else:
-                    self._stop = True
+                    self.stop()
 
     def run(self):
         try:
@@ -374,10 +425,13 @@ class IkaEngine:
         for scene in self.scenes:
             scene.reset()
 
+        self.call_plugins('on_reset_capture')
+
     def set_plugins(self, plugins):
         self.output_plugins = [self]
         self.output_plugins.extend(self.scenes)
         self.output_plugins.extend(plugins)
+        self.call_plugins('on_initialize_plugin')
 
     def enable_plugin(self, plugin):
         if not (plugin in self.output_plugins):
@@ -390,44 +444,17 @@ class IkaEngine:
         self._pause = pause
 
     def _initialize_scenes(self):
-        self.scenes = [
-            scenes.GameTimerIcon(self),
-            scenes.GameStart(self),
-            scenes.GameGoSign(self),
-            scenes.GameKill(self),
-            scenes.GameKillCombo(self),
-            scenes.GameDead(self),
-            scenes.GameOutOfBound(self),
-            scenes.GameFinish(self),
-            scenes.GameSpecialGauge(self),
-            scenes.GameSpecialWeapon(self),
-
-            scenes.GameRankedBattleEvents(self),
-            scenes.PaintScoreTracker(self),
-            scenes.ObjectiveTracker(self),
-            scenes.SplatzoneTracker(self),
-            scenes.InklingsTracker(self),
-
-            scenes.ResultJudge(self),
-            scenes.ResultDetail(self),
-            scenes.ResultUdemae(self),
-            scenes.ResultGears(self),
-            scenes.ResultFesta(self),
-
-            scenes.Lobby(self),
-            # scenes.Downie(self),
-
-            scenes.Blank(self),
-            scenes.Amarec16x10Warning(self),
-        ]
+        self.scenes = initialize_scenes(self)
 
     def __del__(self):
         self.call_plugins('on_engine_destroy')
 
-    def __init__(self, enable_profile=False, abort_at_scene_exception=False):
+    def __init__(self, enable_profile=False, abort_at_scene_exception=False,
+                 keep_alive=False):
         self._initialize_scenes()
 
         self.output_plugins = [self]
+        self._services = {}
         self.last_capture = time.time() - 100
 
         self._stop = False
@@ -437,5 +464,8 @@ class IkaEngine:
         self.close_session_at_eof = False
         self._enable_profile = enable_profile
         self._abort_at_scene_exception = abort_at_scene_exception
+        # Whether exit on EOFError with no next inputs.
+        self._keep_alive = keep_alive
 
+        self.context = {}
         self.create_context()

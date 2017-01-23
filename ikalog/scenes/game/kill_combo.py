@@ -46,7 +46,7 @@ class GameKillCombo(Scene):
         if frame is None:
             return False
 
-    def on_game_killed(self, context):
+    def on_game_killed(self, context, params):
         self.kill_streak += 1
         context['game']['kill_streak'] = self.kill_streak
         context['game']['max_kill_streak'] = max(self.kill_streak, context['game'].get('max_kill_streak', 0))
@@ -58,12 +58,19 @@ class GameKillCombo(Scene):
 
             self._call_plugins('on_game_chained_kill_combo')
         else:
-            self.chain_kill_combos = 0;
+            self.chain_kill_combos = 1; 
+            context['game']['kill_combo'] = self.chain_kill_combos 
+            context['game']['max_kill_combo'] = max(self.chain_kill_combos, context['game'].get('max_kill_combo', 0)) 
 
         self.last_kill_msec = context['engine']['msec']
 
     def on_game_dead(self, context):
         self.resetParams()
+
+    def on_game_reset(self, context):
+        self.resetParams()
+        self.max_kill_streak = 0
+        self.max_kill_combo = 0
 
     def _analyze(self, context):
         pass

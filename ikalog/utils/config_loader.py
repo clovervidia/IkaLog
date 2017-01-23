@@ -92,7 +92,22 @@ def _init_source(opts):
         source.select_source(name=input_args.get('source'))
         return source
 
+    if input_type == 'PYNQ':
+        from ikalog.inputs.pynq_capture import PynqCapture
+        source = PynqCapture(
+            debug=input_args.get('debug', False),
+            enable_output=input_args.get('enable_output', False),
+            mode=input_args.get('mode', 0),
+        )
+        source.select_source(index=0)
+        return source
+
+    if input_type == 'ui':
+        from ikalog.inputs.capture import Capture
+        source = Capture()
+
     return source
+
 
 def _replace_vars(args, vars):
     replaced = {}
@@ -177,9 +192,9 @@ def _init_outputs(opts):
         OutputPlugins.append(outputs.Twitter(**args))
 
     # WebSocket サーバ
-    if 'WebSocket' in output_plugins:
-        args = _replace_vars(output_args['WebSocket'], vars)
-        OutputPlugins.append(outputs.WebSocket(**args))
+    if 'WebSocketServer' in output_plugins:
+        args = _replace_vars(output_args['WebSocketServer'], vars)
+        OutputPlugins.append(outputs.WebSocketServer(**args))
 
     # REST API Server
     if 'RESTAPIServer' in output_plugins:
@@ -199,22 +214,33 @@ def _init_outputs(opts):
         args = _replace_vars(output_args['Description'], vars)
         OutputPlugins.append(outputs.Description(**args))
 
+    # VideoRecorder (class "OBS", for Windows)
+    if 'VideoRecorder' in output_plugins:
+        args = _replace_vars(output_args['VideoRecorder'], vars)
+        OutputPlugins.append(outputs.OBS(**args))
+
     # 不具合調査向け。
     # イベントトリガをコンソールに出力。イベントトリガ時のスクリーンショット保存
     if (('DebugLog' in output_plugins) or opts.get('debug')):
         args = _replace_vars(output_args['DebugLog'], vars)
         OutputPlugins.append(outputs.DebugLog(**args))
 
-    # 不具合調査向け。
-    # ウインドウに対して v キー押下でデバッグ録画を開始する
-    if 'DebugVideoWriter' in output_plugins:
-        args = _replace_vars(output_args['DebugVideoWriter'], vars)
-        OutputPlugins.append(outputs.DebugVideoWriter(**args))
-
     # PreviewDetected: 認識した画像をプレビュー上でマークする
     if 'PreviewDetected' in output_plugins:
         args = _replace_vars(output_args['PreviewDetected'], vars)
         OutputPlugins.append(outputs.PreviewDetected(**args))
+
+    if 'Switcher' in output_plugins:
+        args = _replace_vars(output_args['Switcher'], vars)
+        OutputPlugins.append(outputs.Switcher(**args))
+
+    if 'Boyomi' in output_plugins:
+        args = _replace_vars(output_args['Boyomi'], vars)
+        OutputPlugins.append(outputs.Boyomi(**args))
+
+    if 'MikuMikuMouth' in output_plugins:
+        args = _replace_vars(output_args['MikuMikuMouth'], vars)
+        OutputPlugins.append(outputs.MikuMikuMouth(**args))
 
     return OutputPlugins
 

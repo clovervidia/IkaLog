@@ -95,10 +95,9 @@ class SplatzoneTracker(Scene):
         counter['img_injury_i16'] = img_injury_i16
         diff_pixels = None
         if img_last_injury_i16 is not None:
-            img_white = np.maximum(
-                self._white_filter(img_injury),
-                self._white_filter(img_last_injury),
-            )
+            img_white = \
+                self._white_filter(img_injury) | \
+                self._white_filter(img_last_injury)
             img_diff = abs(img_injury_i16 - img_last_injury_i16)
             img_diff_u8 = np.array(img_diff, np.uint8)
             img_diff_u8[img_diff_u8 < 16] = 0
@@ -177,6 +176,9 @@ class SplatzoneTracker(Scene):
         context['game']['splatzone_counter_team_counter'] = self._counter2
 
         if (counter1[1] != 0) or (counter2[1] != 0) or (loss1[1] != 0) or (loss2[1] != 0):
+            IkaUtils.add_event(
+                context, 'splatzone', [self._counter1['value'],
+                                       self._counter2['value']])
             self._call_plugins('on_game_splatzone_counter_update')
 
     def _analyze(self, context):

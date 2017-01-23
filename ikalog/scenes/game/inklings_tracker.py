@@ -40,7 +40,18 @@ class InklingsTracker(StatefulScene):
         self.my_team = [False, False, False, False]
         self.counter_team = [False, False, False, False]
         self._last_bitmap = None
+        self._last_game_status = None
 
+    def _match_in_the_battle(self, context):
+        img = self._crop_frame(
+            context, self.meter_x1, 24 + 38, self.meter_x2, 24 + 40
+        )
+
+        img_body_bg = matcher.MM_DARK()(img)
+        num_bg_pixels = np.sum(img_body_bg)  # usually 1000 to 1200?
+
+        in_the_battle = 1000 < num_bg_pixels
+        return in_the_battle
 
     ##
     # _get_vs_xpos(self, context)
@@ -84,7 +95,6 @@ class InklingsTracker(StatefulScene):
     # of the squid. Since it's body should be colored (not white or black),
     # it ignores eye pixels without colored body pixels.
     #
-    # team
     def _find_inklings(self, context, x1, x2, team=[False, False, False, False]):
         if (context['engine']['frame'] is None) or not (x1 < x2):
             return team
@@ -95,17 +105,20 @@ class InklingsTracker(StatefulScene):
         # Manipulate histgram array of inkling eyes.
         img_eye = matcher.MM_WHITE()(
             self._crop_frame(context,
-                             self.meter_x1, 24+16, self.meter_x2, 24 + 30))
+                             self.meter_x1, 24 + 16, self.meter_x2, 24 + 30))
         img_eye_hist = np.sum(img_eye, axis=0)
 
         # Manipulate histgram array of inkling bodies.
-        img_fg_b = matcher.MM_WHITE(sat=(40, 255), visibility=(60, 255))(
-            self._crop_frame(context,
-                             self.meter_x1, 24+30, self.meter_x2, 24 + 34))
-        img_fg_hist = np.sum(img_fg_b / 255, axis=0)
+        img_body = self._crop_frame(
+            context, self.meter_x1, 24 + 30, self.meter_x2, 24 + 34
+        )
+
+        white_filter = matcher.MM_WHITE(sat=(40, 255), visibility=(60, 255))
+        img_body_b = white_filter(img_body)
+        img_body_hist = np.sum(img_body_b / 255, axis=0)
 
         # Mask false-positive values in img_eye_hist.
-        img_eye_hist[img_fg_hist < 4] = 0
+        img_eye_hist[img_body_hist < 4] = 0
 
         if 0:
             cv2.line(frame, (self.meter_x1 + x1, 0),
@@ -178,6 +191,43 @@ class InklingsTracker(StatefulScene):
         #   [ True, True, True, False ] ... 3 inklings are active.
         return team
 
+    def _detect_team_color(self, pixels):
+        criteria = \
+            (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
+
+        pixels = np.array(pixels.reshape((-1, 3)), dtype=np.float32)
+
+        ret, label, center = cv2.kmeans(
+            pixels, 2, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
+
+        # one is black, another is the team color.
+
+        colors = np.array(center, dtype=np.uint8).reshape((1, 2, 3))
+        colors_hsv = cv2.cvtColor(colors, cv2.COLOR_BGR2HSV)
+        x = np.argmax(colors_hsv[:, :, 2])
+        team_color_bgr = colors[0, x, :]
+        team_color_hsv = colors_hsv[0, x, :]
+
+        return {
+            'rgb': cv2.cvtColor(colors, cv2.COLOR_BGR2RGB).tolist()[0][x],
+            'hsv': cv2.cvtColor(colors, cv2.COLOR_BGR2HSV).tolist()[0][x],
+        }
+
+    def _detect_team_colors(self, context):
+        vs_xpos = self._get_vs_xpos(context)
+        if vs_xpos is None:
+            return False
+
+        img_body_my_team = context['engine']['frame'] \
+            [24 + 30: 24 + 34, self.meter_x1: self.meter_x1 + vs_xpos - 30, :]
+        img_body_counter_team = context['engine']['frame'] \
+            [24 + 30: 24 + 34, self.meter_x1 + vs_xpos + 30: self.meter_x2, :]
+
+        context['game']['my_team_color'] = \
+            self._detect_team_color(img_body_my_team)
+        context['game']['counter_team_color'] = \
+            self._detect_team_color(img_body_counter_team)
+
     def _list2bitmap(self, list1, list2):
         l = list1.copy()
         l.extend(list2)
@@ -189,9 +239,25 @@ class InklingsTracker(StatefulScene):
         return bitmap
 
     ##
-    # _state_default
+    # _state_not_in_the_battle
     #
-    # In default state, this scene detects alive inklings and update
+    # In this state, player is just wondering in the stage, or testing
+    # weapons. No inklings are shown.
+    #
+    def _state_not_in_the_battle(self, context):
+        # FIXME: use matched_in
+        if self.is_another_scene_matched(context, 'GameTimerIcon') == False:
+            self._switch_to_state_default(context)
+            return False
+
+        context['game']['in_the_battle'] = False
+
+        return False
+
+    ##
+    # _state_in_the_battle
+    #
+    # In this state, this scene detects alive inklings and update
     # context['game']['inkling_state'].
     #
     # The format of context['game']['inkling_state'] is:
@@ -205,10 +271,10 @@ class InklingsTracker(StatefulScene):
     #
     # This needs self.(my_|counter_) team fields intialized.
     #
-    def _state_default(self, context):
+    def _state_in_the_battle(self, context):
         if self.is_another_scene_matched(context, 'GameTimerIcon') == False:
             if not self.matched_in(context, 20 * 1000):
-                self._switch_state(self._state_start)
+                self._switch_state(self._state_default)
             return False
 
         frame = context['engine']['frame']
@@ -229,11 +295,14 @@ class InklingsTracker(StatefulScene):
             [e for e in my_team if e is not None],
             [e for e in counter_team if e is not None],
         ]
+        context['game']['in_the_battle'] = True
 
         bitmap = self._list2bitmap(my_team, counter_team)
         if self._last_bitmap != bitmap:
             self._call_plugins('on_game_inkling_state_update')
             self._last_bitmap = bitmap
+            IkaUtils.add_event(
+                context, 'inklings', context['game']['inkling_state'])
 
         if 0:
             print(my_team, counter_team)
@@ -249,10 +318,25 @@ class InklingsTracker(StatefulScene):
             cv2.imshow('frame', frame)
             cv2.waitKey(100)
 
+        # game_status
+        vs_xpos2 = vs_xpos - 210
+        if abs(vs_xpos2) < 20:
+            game_status = 'neutral'
+        elif vs_xpos2 > 0:
+            game_status = 'winning'
+        else:
+            game_status = 'losing'
+
+        if game_status != self._last_game_status:
+            self._call_plugins(
+                'on_game_game_status_update',
+                params={'game_status': game_status})
+            self._last_game_status = game_status
+
         return True
 
     ##
-    # _state_start
+    # _state_default
     #
     # This state will be activated at start the beginning of the game.
     # Purpose of this state is, to figure out which inklings are active.
@@ -271,9 +355,9 @@ class InklingsTracker(StatefulScene):
     # If our squad only has 3 inklings:
     #     [ False, False, False, None ]
     #
-    # One the fields are set, this scene will switch to _state_default.
+    # One the fields are set, this scene will switch to _state_in_the_battle.
     #
-    def _state_start(self, context):
+    def _state_default(self, context):
         if self.is_another_scene_matched(context, 'GameTimerIcon') == False:
             return False
 
@@ -281,47 +365,54 @@ class InklingsTracker(StatefulScene):
         if frame is None:
             return False
 
+        if not self._match_in_the_battle(context):
+            # Seems not in the actual battle. Maybe the player is
+            # Wandering the stage, or just trying some weapons.
+            self._switch_state(self._state_not_in_the_battle)
+            return False
+
+        # Is in battle?
+
         vs_xpos = self._get_vs_xpos(context)
         if vs_xpos is None:
             return False
 
-        if context['lobby'].get('type') in ['public', 'festa']:
-            # If lobby.type is 'public' or 'festa', the number of teams should
-            # be four.
-            my_team = [False, False, False, False]
-            counter_team = [False, False, False, False]
+        my_team = self._find_inklings(context, 0, vs_xpos - 35)
+        counter_team = self._find_inklings(
+            context, vs_xpos + 35, self.meter_width_half * 2)
 
-        else:
-            my_team = self._find_inklings(context, 0, vs_xpos - 35)
-            counter_team = self._find_inklings(
-                context, vs_xpos + 35, self.meter_width_half * 2)
+        for i in range(len(my_team)):
+            my_team[i] = {True: False, False: None}[my_team[i]]
 
-            for i in range(len(my_team)):
-                my_team[i] = {True: False, False: None}[my_team[i]]
+        for i in range(len(counter_team)):
+            counter_team[i] = {True: False, False: None}[counter_team[i]]
 
-            for i in range(len(counter_team)):
-                counter_team[i] = {True: False, False: None}[counter_team[i]]
+        vs_xpos = self._get_vs_xpos(context)
+        if vs_xpos is None:
+            return False
 
         self.my_team = my_team
         self.counter_team = counter_team
         self._last_bitmap = None
+        self._last_game_status = None
+        self._detect_team_colors(context)
 
         context['game']['inkling_state_at_start'] = [my_team, counter_team]
-        self._switch_state(self._state_default)
+        self._switch_state(self._state_in_the_battle)
 
         return True
 
-    def _swtich_to_state_start(self, context):
+    def _switch_to_state_default(self, context):
         self.my_team = [False, False, False, False]
         self.counter_team = [False, False, False, False]
 
-        return self._switch_state(self._state_start)
+        return self._switch_state(self._state_default)
 
     def on_game_start(self, context):
-        self._swtich_to_state_start(context)
+        self._switch_to_state_default(context)
 
     def on_game_go_sign(self, context):
-        self._swtich_to_state_start(context)
+        self._switch_to_state_default(context)
 
     def _analyze(self, context):
         pass

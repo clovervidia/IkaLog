@@ -18,6 +18,8 @@
 #  limitations under the License.
 #
 import os
+import queue
+import re
 import time
 import threading
 
@@ -57,21 +59,32 @@ class CVFile(VideoInput):
     # override
     def _select_device_by_name_func(self, source):
         if isinstance(source, str):
-            self._source_files = [source]
+            self._file_queue.put(source)
         elif isinstance(source, list):
-            self._source_files = source
+            for item in source:
+                self._file_queue.put(item)
         else:
             return False
 
         return self._init_with_sources()
 
     # override
+    def put_source_file(self, file_path):
+        self._file_queue.put(file_path)
+        if not self.video_capture:
+            self._init_with_sources()
+        return True
+
+    # override
     def on_eof(self):
         return self._init_with_sources()
 
     def _init_with_sources(self):
-        if not self._source_files:
+        if self._file_queue.empty():
+            self.video_capture = None
             return False
+
+        self._source_file = self._file_queue.get()
 
         self.lock.acquire()
         try:
@@ -81,7 +94,6 @@ class CVFile(VideoInput):
             self.reset()
 
             # FIXME: Does it work with non-ascii path?
-            self._source_file = self._source_files.pop(0)
             self.video_capture = cv2.VideoCapture(self._source_file)
             if self.video_capture.isOpened():
                 self._epoch_time = self.get_start_time()
@@ -95,17 +107,13 @@ class CVFile(VideoInput):
         return self.is_active()
 
     # override
-    def _next_frame_func(self):
-        pass
-
-    # override
     def _get_current_timestamp_func(self):
-        video_msec = self.video_capture.get(cv2.CAP_PROP_POS_MSEC)
-
-        if video_msec is None:
+        if self.video_capture is None:
             return self.get_tick()
 
-        return video_msec
+        video_msec = self.video_capture.get(cv2.CAP_PROP_POS_MSEC)
+        return video_msec or self.get_tick()
+
 
     # override
     def _read_frame_func(self):
@@ -154,7 +162,8 @@ class CVFile(VideoInput):
     # override
     def set_pos_msec(self, pos_msec):
         """Moves the video position to |pos_msec| in msec."""
-        self.video_capture.set(cv2.CAP_PROP_POS_MSEC, pos_msec)
+        if self.video_capture:
+            self.video_capture.set(cv2.CAP_PROP_POS_MSEC, pos_msec)
 
     # override
     def get_source_file(self):
@@ -163,10 +172,28 @@ class CVFile(VideoInput):
     def set_use_file_timestamp(self, use_file_timestamp=True):
         self._use_file_timestamp = use_file_timestamp
 
+    def _check_opencv_config(self):
+        build_info = cv2.getBuildInformation()
+        ffmpeg_line = re.search(r'FFMPEG\:\s+(.*)', build_info)
+
+        is_osx = IkaUtils.isOSX()
+        is_ffmpeg_enabled = (ffmpeg_line and ffmpeg_line.group(1) == 'YES')
+
+        if (is_osx and not is_ffmpeg_enabled):
+            IkaUtils.dprint('%s: OpenCV misconfiguration detected.\n'
+                '  - IkaLog may experience serious performance degradation.\n'
+                '  - IkaLog may not able to read several video formats.\n'
+                '  Please review your OpenCV Configuration.\n'
+                '  %s' % (self, ffmpeg_line.group(0))
+            )
+            time.sleep(5)
+
     def __init__(self):
+        self._check_opencv_config()
+
         self.video_capture = None
         self._source_file = None
-        self._source_files = []
+        self._file_queue = queue.Queue()
         self._epoch_time = None
         self._use_file_timestamp = True
         super(CVFile, self).__init__()

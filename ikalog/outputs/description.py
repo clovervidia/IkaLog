@@ -63,6 +63,9 @@ class Description(object):
         self._description += (message + "\n")
         self._print(self._description)
 
+    def on_reset_capture(self, context):
+        self.reset()
+
     def on_game_reset(self, context):
         self.reset()
 
@@ -78,7 +81,7 @@ class Description(object):
         time = self.get_timestamp(context)
         self.append_description("ゲーム終了", time)
 
-    def on_game_killed(self, context):
+    def on_game_killed(self, context, params):
         time = self.get_timestamp(context)
         self.append_description("く8彡 プレイヤーをたおした！", time)
 
@@ -278,5 +281,12 @@ class Description(object):
         self._session_active = False
 
     def on_game_session_abort(self, context):
-        if self._session_active:
-          self.on_game_session_end(context)
+        # If session is not active, on_game_session_end is already called.
+        # So do nothing.
+        if not self._session_active:
+            return
+
+        # Only when description is available or no file has been created yet,
+        # on_game_session_end is called.
+        if self._description or context['game']['index'] == 0:
+            self.on_game_session_end(context)

@@ -57,7 +57,7 @@ class ObjectiveTracker(Scene):
                 img_hsv[:, :, 2], (self.tower_width, 20))
 
         # ゲージのうち信頼できる部分だけでマスクする
-        img3 = np.minimum(img, self.ui_tower_mask)
+        img3 = img & self.ui_tower_mask
 
         # 白い部分にいまヤグラ/ホコがある
         img3_hsv = cv2.cvtColor(img3, cv2.COLOR_BGR2HSV)
@@ -122,6 +122,7 @@ class ObjectiveTracker(Scene):
         context['game']['tower']['max'] = new_max
         if updated:
             self._call_plugins('on_game_objective_position_update')
+            IkaUtils.add_event(context, 'objective', new_pos)
 
         self._last_update_msec = context['engine']['msec']
         return True

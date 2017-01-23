@@ -34,8 +34,9 @@ import numpy as np
 
 from ikalog.api import APIClient
 from ikalog.scenes.stateful_scene import StatefulScene
-from ikalog.utils import *
 from ikalog.inputs.filters import OffsetFilter
+from ikalog.utils import *
+from ikalog.utils.player_name import *
 
 
 class ResultDetail(StatefulScene):
@@ -49,7 +50,7 @@ class ResultDetail(StatefulScene):
         loss_lose = (1.0 - r_lose) ** 2
         loss_x = (1.0 - r_x) ** 2
 
-        return 1.0 - math.sqrt((loss_win + loss_lose + loss_x)/3)
+        return 1.0 - math.sqrt((loss_win + loss_lose + loss_x) / 3)
 
     #
     # AKAZE ベースのオフセット／サイズ調整
@@ -289,7 +290,6 @@ class ResultDetail(StatefulScene):
         self.adjust_method_generic(context, l)
         self.adjust_method_offset(context, l)
 
-
         if len(l) > 0:
             best = sorted(l, key=lambda x: x['score'], reverse=True)[0]
             img = best['frame']
@@ -347,6 +347,12 @@ class ResultDetail(StatefulScene):
 
         IkaUtils.dprint('%s: weapons recoginition done.' % self)
 
+        if 0:
+            self._detect_names_per_my_kill(context)
+
+            self._analyze_kills_per_weapon(context)
+            self._analyze_kills_per_player(context)
+
         self._call_plugins_later('on_result_detail')
         self._call_plugins_later('on_game_individual_result')
 
@@ -374,7 +380,7 @@ class ResultDetail(StatefulScene):
         img_fest_title_hsv = cv2.cvtColor(img_fest_title, cv2.COLOR_BGR2HSV)
         yellow = cv2.inRange(img_fest_title_hsv[:, :, 0], 32 - 2, 32 + 2)
         yellow2 = cv2.inRange(img_fest_title_hsv[:, :, 2], 240, 255)
-        img_fest_title_mask = np.minimum(yellow, yellow2)
+        img_fest_title_mask = yellow & yellow2
         is_fes = np.sum(img_fest_title_mask) > img_fest_title_mask.shape[
             0] * img_fest_title_mask.shape[1] * 16
 
@@ -480,6 +486,61 @@ class ResultDetail(StatefulScene):
 
         return (my_team_color, counter_team_color)
 
+    def _detect_names_per_my_kill(self, context):
+        all_players = context['game']['players']
+        me = IkaUtils.getMyEntryFromContext(context)
+
+        counter_team = \
+            list(filter(lambda x: x['team'] != me['team'], all_players))
+
+        img_name_counter_team = \
+            list(map(lambda e: e['img_name_normalized'], counter_team))
+
+        ct_name_classifier = PlayerNameClassifier(img_name_counter_team)
+
+        for kill_index in range(len(context['game'].get('kill_list', []))):
+            kill = context['game']['kill_list'][kill_index]
+
+            if kill.get('img_kill_hid', None) is None:
+                continue
+
+            player_index = ct_name_classifier.predict(kill['img_kill_hid'])
+
+            if player_index is None:
+                continue
+
+            if 1:
+                IkaUtils.dprint('%s: my kill %d -> player %d' %
+                                (self, kill_index, player_index))
+
+            kill['player'] = counter_team[player_index]
+
+    def _analyze_kills_per_weapon(self, context):
+        r = {}
+        for kill in context['game'].get('kill_list', []):
+            if 'player' in kill:
+                weapon = kill['player']['weapon']
+                r[weapon] = r.get(weapon, 0) + 1
+        context['game']['kills_per_weapon'] = r
+
+        IkaUtils.dprint('%s: _analyze_kills_per_weapon result: %s' % (self, r))
+
+        return r
+
+    def _analyze_kills_per_player(self, context):
+        for kill in context['game'].get('kill_list', []):
+            if 'player' in kill:
+                player = kill['player']
+                player['my_kills'] = player.get('my_kills', 0) + 1
+
+                if 0:
+                    IkaUtils.dprint('%s: _analyze_kills_per_player' % self)
+                    for player in context['game']['players']:
+                        IkaUtils.dprint('   player %d: my_kills = %d' % (
+                            context['game']['players'].index(player),
+                            player['my_kills']
+                        ))
+
     def analyze_entry(self, img_entry):
         # 各プレイヤー情報のスタート左位置
         entry_left = 610
@@ -535,7 +596,7 @@ class ResultDetail(StatefulScene):
         img_fes_title_hsv = cv2.cvtColor(img_fes_title, cv2.COLOR_BGR2HSV)
         yellow = cv2.inRange(img_fes_title_hsv[:, :, 0], 32 - 2, 32 + 2)
         yellow2 = cv2.inRange(img_fes_title_hsv[:, :, 2], 240, 255)
-        img_fes_title_mask = np.minimum(yellow, yellow2)
+        img_fes_title_mask = yellow & yellow2
         is_fes = np.sum(img_fes_title_mask) > img_fes_title_mask.shape[
             0] * img_fes_title_mask.shape[1] * 16
 
@@ -554,6 +615,7 @@ class ResultDetail(StatefulScene):
             "img_rank": img_rank,
             "img_weapon": img_weapon,
             "img_name": img_name,
+            "img_name_normalized": normalize_player_name(img_name),
             "img_score": img_score,
             "img_kills": img_kills,
             "img_deaths": img_deaths,
@@ -600,28 +662,91 @@ class ResultDetail(StatefulScene):
 
         return entry
 
-    def analyze(self, context):
+    def extract_entries(self, context, img=None):
+        if img is None:
+            img = self.adjust_image(context)
+
         # 各プレイヤー情報のスタート左位置
         entry_left = 610
         # 各プレイヤー情報の横幅
-        entry_width = 610
+        entry_width = 630
         # 各プレイヤー情報の高さ
         entry_height = 45
         entry_top = [101, 166, 231, 296, 431, 496, 561, 626]
 
-        img = self.adjust_image(context)
-
-        # インクリング一覧
-        context['game']['players'] = []
-        weapon_list = []
-        entry_id = 0
+        img_entries = []
 
         for entry_id in range(len(entry_top)):  # 0..7
             top = entry_top[entry_id]
 
             img_entry = img[top:top + entry_height,
                             entry_left:entry_left + entry_width]
+            img_entries.append(img_entry)
 
+        return img_entries
+
+    def is_entries_still_sliding(self, img_entries):
+        white_filter = matcher.MM_WHITE()
+        array0to14 = np.array(range(15), dtype=np.int32)
+
+        x_pos_list = []
+        for img_entry in img_entries:
+            img_XX = img_entry[:, 1173 - 610: 1173 + 13 - 610]  # -> 2D
+            img_XX_hist = np.sum(white_filter(img_XX), axis=0)  # -> 1D
+
+            img_XX_hist_x = np.extract(img_XX_hist > 0, array0to14[
+                                       0:img_XX_hist.shape[0]])
+
+            if img_XX_hist_x.shape[0] == 0:
+                continue
+
+            img_XX_hist_x_avg = np.average(img_XX_hist_x)
+            x_pos_list.append(img_XX_hist_x_avg)
+
+        x_avg_min = np.amin(x_pos_list)
+        x_avg_max = np.amax(x_pos_list)
+        x_diff = int(x_avg_max - x_avg_min)
+
+        if 0:  # debug
+            print('is_entries_still_sliding: x_pos_list %s min %f max %f diff %d' %
+                  (x_pos_list, x_avg_min, x_avg_max, x_diff))
+
+        return x_diff
+
+    def analyze(self, context):
+        context['game']['players'] = []
+        weapon_list = []
+
+        img = self.adjust_image(context)
+        img_entries = self.extract_entries(context, img)
+
+        # Adjust img_entries rect using result of
+        # self.is_entries_still_sliding().
+        # This allows more accurate weapon classification.
+        diff_x = self.is_entries_still_sliding(img_entries)
+        if diff_x > 0:
+            white_filter = matcher.MM_WHITE()
+            index = 7
+
+            # Find the last player's index.
+            while (0 < index) and \
+                    (np.sum(white_filter(img_entries[index])) < 1000):
+                index -= 1
+
+            # adjust the player's rect 3 times.
+            for i in range(3):
+                diff_x = self.is_entries_still_sliding(img_entries)
+                img_entry = img_entries[index]
+                w = img_entry.shape[1] - diff_x
+                img_entries[index][:, 0: w] = img_entry[:, diff_x: w + diff_x]
+
+            if 0:
+                cv2.imshow('a', img_entries[0])
+                cv2.imshow('b', img_entries[index])
+                cv2.waitKey(0)
+
+        for entry_id in range(len(img_entries)):
+            img_entry = img_entries[entry_id]
             e = self.analyze_entry(img_entry)
 
             if e.get('rank', None) is None:
@@ -662,6 +787,8 @@ class ResultDetail(StatefulScene):
 
         # そのほか
         # context['game']['timestamp'] = datetime.now()
+        context['game']['image_scoreboard'] = \
+            copy.deepcopy(context['engine']['frame'])
         self._call_plugins_later('on_result_detail_still')
 
         return True
@@ -707,13 +834,12 @@ class ResultDetail(StatefulScene):
 
         # マッチ2: マッチ1を満たした場合は、白文字が安定するまで待つ
         # 条件1: 前回のイメージとの白文字の diff が 0 pixel になること
-        # 条件2: 過去n回文の白文字の diff が <10 pixels になること
-        #        (ノイズが多いキャプチャデバイス向けの救済策)
+        # 条件2: K/D数の手前にある"X"印がの位置が縦方向で合っていること
         diff_pixels = None
         img_current_h_i16 = None
 
         matched_diff0 = False
-        matched_diff10 = False
+        matched_diffX = False
 
         if matched:
             img_current_bgr = frame[626:626 + 45, 640:1280]
@@ -740,18 +866,32 @@ class ResultDetail(StatefulScene):
         if diff_pixels is not None:
             matched_diff0 = (diff_pixels == 0)
 
-            self._diff_pixels.append(diff_pixels)
-            if len(self._diff_pixels) > 4:
-                self._diff_pixels.pop(0)
-                matched_diff10 = np.max(self._diff_pixels) < 10
+            # 白色マスクがぴったり合わなかった場合には X 印によるマッチを行う
+            # ・is_entries_still_sliding() の値（X印の散らばり度）
+            #   が 0 であれば matched_diffX = True
+            # ・is_entries_still_sliding() の返却値（X印の散らばり度）
+            #   の履歴の最小値と最新値が一致したら妥協で matched_diffX = True
 
-            # print('img_diff_pixels', diff_pixels, self._diff_pixels, matched_diff0, matched_diff10)
+        if (diff_pixels is not None) and (not matched_diff0):
+            # FIXME: adjust_image は非常にコストが高い
+            img = self.adjust_image(context)
+            img_entries = self.extract_entries(context, img)
+            diff_x = self.is_entries_still_sliding(img_entries)
+            matched_diffX = (diff_x == 0)
+
+            if not matched_diffX:
+                self._diff_pixels.append(diff_x)
+
+                if len(self._diff_pixels) > 4:
+                    self._diff_pixels.pop(0)
+                    matched_diffX = \
+                        (np.amin(self._diff_pixels) == matched_diffX)
 
         # escaped: 1000ms 以上の非マッチが続きシーンを抜けたことが確定
         # matched2: 白文字が安定している(条件1 or 条件2を満たしている)
         # triggered: すでに一定時間以内にイベントが取りがされた
         escaped = not self.matched_in(context, 1000)
-        matched2 = matched_diff0 or matched_diff10
+        matched2 = matched_diff0 or matched_diffX
         triggered = self.matched_in(
             context, 30 * 1000, attr='_last_event_msec')
         if matched2 and (not triggered):
@@ -787,7 +927,7 @@ class ResultDetail(StatefulScene):
         analyzed = True
         won = IkaUtils.getWinLoseText(
             context['game']['won'], win_text="win", lose_text="lose", unknown_text="unknown")
-        fes = context['game']['is_fes']
+        fes = context['game'].get('is_fes', False)
         print("matched %s analyzed %s result %s fest %s" %
               (matched, analyzed, won, fes))
         print('--------')

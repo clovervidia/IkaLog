@@ -3,7 +3,7 @@
 #
 #  IkaLog
 #  ======
-#  Copyright (C) 2015 Takeshi HASEGAWA
+#  Copyright (C) 2016 Takeshi HASEGAWA
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -21,126 +21,62 @@
 import os
 import time
 
-from ikalog.scenes.plaza_user_stat import *  # Fixme...
+from ikalog.plugin import IkaLogPlugin
+from ikalog.utils import *
 
 
-# Needed in GUI mode
-try:
-    import wx
-except:
-    pass
+class ScreenshotPlugin(IkaLogPlugin):
 
-_ = Localization.gettext_translation('screenshot', fallback=True).gettext
+    def generate_timestr(self, context=None):
+        t = time.time() if context is None else IkaUtils.getTime(context)
+        return time.strftime('%Y%m%d_%H%M%S', time.localtime(t))
 
-# IkaOutput_Screenshot: IkaLog Output Plugin for Screenshots
-#
-# Save screenshots on certain events
+    def write_screenshot(self, frame, filename=None):
+        if filename is None:
+            filename = 'snapshot%s.png' % self.generate_timestr()
 
+        if filename == os.path.basename(filename):
+            filename = os.path.join(self.config['dest_dir'], filename)
 
-class Screenshot(object):
+        if IkaUtils.writeScreenshot(filename, frame):
+            IkaUtils.dprint('%s: Saved a screenshot %s' % (self, filename))
+            return True
 
-    def apply_ui(self):
-        self.result_detail_enabled = self.checkResultDetailEnable.GetValue()
-        self.miiverse_drawing_enabled = self.checkMiiverseDrawingEnable.GetValue()
-        self.dir = self.editDir.GetValue()
+        IkaUtils.dprint('%s: Failed to save a screenshot %s' %
+                        (self, filename))
+        return False
 
-    def refresh_ui(self):
-        self._internal_update = True
-        self.checkResultDetailEnable.SetValue(self.result_detail_enabled)
-        self.checkMiiverseDrawingEnable.SetValue(self.miiverse_drawing_enabled)
-
-        if not self.dir is None:
-            self.editDir.SetValue(self.dir)
-        else:
-            self.editDir.SetValue('')
-
-    def on_config_reset(self, context=None):
-        self.result_detail_enabled = False
-        self.miiverse_drawing_enabled = False
-        self.dir = os.path.join(os.getcwd(), 'screenshots')
-
-    def on_config_load_from_context(self, context):
-        self.on_config_reset(context)
-        try:
-            conf = context['config']['screenshot']
-        except:
-            conf = {}
-
-        if 'ResultDetailEnable' in conf:
-            self.result_detail_enabled = conf['ResultDetailEnable']
-
-        if 'MiiverseDrawingEnable' in conf:
-            self.miiverse_drawing_enabled = conf['MiiverseDrawingEnable']
-
-        if 'Dir' in conf:
-            self.dir = conf['Dir']
-
-        self.refresh_ui()
+    def on_validate_configuration(self, config):
+        assert config['dest_dir'] is not None
+        assert os.path.exists(config['dest_dir'])
+        assert config['enabled'] in [True, False]
         return True
 
-    def on_config_save_to_context(self, context):
-        context['config']['screenshot'] = {
-            'ResultDetailEnable': self.result_detail_enabled,
-            'MiiveseDrawingEnable': self.miiverse_drawing_enabled,
-            'Dir': self.dir,
-        }
+    def on_reset_configuration(self):
+        self.config['dest_dir'] = 'screeenshots/'
+        self.config['enabled'] = False
 
-    def on_config_apply(self, context):
-        self.apply_ui()
+    def on_set_configuration(self, config):
+        self.config['dest_dir'] = config['dest_dir']
+        self.config['enabled'] = config['enabled']
 
-    def on_option_tab_create(self, notebook):
-        self.panel = wx.Panel(notebook, wx.ID_ANY)
-        self.page = notebook.InsertPage(0, self.panel, _('Screenshot'))
-        self.layout = wx.BoxSizer(wx.VERTICAL)
-        self.panel.SetSizer(self.layout)
-        self.checkResultDetailEnable = wx.CheckBox(
-            self.panel, wx.ID_ANY, _('Save screenshots of game results'))
-        self.checkMiiverseDrawingEnable = wx.CheckBox(
-            self.panel, wx.ID_ANY, _('Save drawings in Inkopolis'))
-        self.editDir = wx.TextCtrl(self.panel, wx.ID_ANY, u'hoge')
-
-        self.layout.Add(wx.StaticText(
-            self.panel, wx.ID_ANY, _('Folder to save screenshots')))
-        self.layout.Add(self.editDir, flag=wx.EXPAND)
-        self.layout.Add(self.checkResultDetailEnable)
-        self.layout.Add(self.checkMiiverseDrawingEnable)
-
-        self.panel.SetSizer(self.layout)
-
-    def save_drawing(self, context):
-        x1 = 241
-        x2 = x1 + 367
-        y1 = 528
-        y2 = y1 + 142
-
-        drawing = context['engine']['frame'][y1:y2, x1:x2, :]
-
-        timestr = time.strftime("%Y%m%d_%H%M%S",
-                                time.localtime(IkaUtils.getTime(context)))
-        destfile = os.path.join(self.dir, 'miiverse_%s.png' % timestr)
-
-        IkaUtils.writeScreenshot(destfile, drawing)
-        print(_('Saved a screenshot %s') % destfile)
-
-    ##
-    # on_result_detail_still Hook
-    # @param self      The Object Pointer
-    # @param context   IkaLog context
-    #
     def on_result_detail_still(self, context):
-        timestr = time.strftime("%Y%m%d_%H%M%S",
-                                time.localtime(IkaUtils.getTime(context)))
-        destfile = os.path.join(self.dir, 'ikabattle_%s.png' % timestr)
+        if not self.config['enabled']:
+            return
 
-        IkaUtils.writeScreenshot(destfile, context['engine']['frame'])
-        print(_('Saved a screenshot %s') % destfile)
+        timestr = self.generate_timestr(context)
+        destfile = os.path.join(
+            self.config['dest_dir'], 'ikabattle_%s.png' % timestr)
 
-    def on_key_press(self, context, key):
-        if not (key == 0x53 or key == 0x73):
-            return False
+        self.write_screenshot(context['engine']['frame'], filename=destfile)
 
-        if PlazaUserStat().match(context):
-            self.save_drawing(context)
+    def on_initialize_plugin(self, context):
+        engine = context['engine']['engine']
+        engine.set_service('screenshot_save', self.write_screenshot)
+        engine.set_service('screenshot_get_configuration',
+                           self.get_configuration)
+        engine.set_service('screenshot_set_configuration',
+                           self.set_configuration)
 
     ##
     # Constructor
@@ -148,6 +84,15 @@ class Screenshot(object):
     # @param dir          Destionation directory (Relative path, or absolute path)
     #
     def __init__(self, dest_dir=None):
-        self.result_detail_enabled = (not dest_dir is None)
-        self.miiverse_drawing_enabled = False
-        self.dir = dest_dir
+        super(ScreenshotPlugin, self).__init__()
+
+
+class Screenshot(ScreenshotPlugin):
+
+    def __init__(self, dest_dir=None):
+        super(Screenshot, self).__init__()
+
+        config = self.get_configuration()
+        config['dest_dir'] = dest_dir
+        config['enabled'] = True
+        self.set_configuration(config)

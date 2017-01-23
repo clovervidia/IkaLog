@@ -58,12 +58,16 @@ class Slack(object):
         self._internal_update = False
 
     def on_config_reset(self, context=None):
+        self.config_reset()
+        self.refresh_ui()
+
+    def config_reset(self):
         self.enabled = False
         self.url = ''
         self.username = 'IkaLog'
 
     def on_config_load_from_context(self, context):
-        self.on_config_reset(context)
+        self.config_reset()
 
         try:
             conf = context['config']['slack']
@@ -94,7 +98,7 @@ class Slack(object):
 
     def on_option_tab_create(self, notebook):
         self.panel = wx.Panel(notebook, wx.ID_ANY)
-        self.page = notebook.InsertPage(0, self.panel, _('Slack'))
+        self.panel_name = _('Slack')
         self.layout = wx.BoxSizer(wx.VERTICAL)
 
         self.checkEnable = wx.CheckBox(
@@ -167,6 +171,10 @@ class Slack(object):
         except:
             print("モジュール slackweb がロードできませんでした。 Slack 投稿ができません。")
             print("インストールするには以下のコマンドを利用してください。\n    pip install slackweb\n")
+
+    def on_initialize_plugin(self, context):
+        engine = context['engine']['engine']
+        engine.set_service('slack_post', self.post)
 
     ##
     # Constructor

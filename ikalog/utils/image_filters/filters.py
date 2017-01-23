@@ -25,6 +25,8 @@ from ikalog.utils import IkaUtils
 
 class ImageFilter(object):
 
+    want_grayscale_image = True
+    
     # For backward compatibility
     _warned_evaluate_is_deprecated = False
 
@@ -78,7 +80,7 @@ class MM_WHITE(ImageFilter):
         img_hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
         img_match_s = cv2.inRange(img_hsv[:, :, 1], sat_min, sat_max)
         img_match_v = cv2.inRange(img_hsv[:, :, 2], vis_min, vis_max)
-        img_match = np.minimum(img_match_s, img_match_v)
+        img_match = img_match_s & img_match_v
         return img_match
 
     def __init__(self, sat=(0, 32), visibility=(230, 256)):
@@ -120,6 +122,9 @@ class MM_DARK(MM_BLACK):
     def __init__(self, visibility=(0, 64)):
         super(MM_DARK, self).__init__(visibility=visibility)
 
+class MM_NOT_DARK(MM_BLACK):
+    def __init__(self, visibility=(64, 255)):
+        super(MM_NOT_DARK, self).__init__(visibility=visibility)
 
 class MM_NOT_BLACK(MM_BLACK):
 
@@ -128,10 +133,10 @@ class MM_NOT_BLACK(MM_BLACK):
             img_bgr=img_bgr, img_gray=img_gray)
         return 255 - img_result
 
-# MM_COLOR_BY_HUE:
-
 
 class MM_COLOR_BY_HUE(ImageFilter):
+
+    want_grayscale_image = False
 
     def _hue_range_to_list(self, r):
         # FIXME: 0, 180をまたぐ場合にふたつに分ける
@@ -161,7 +166,7 @@ class MM_COLOR_BY_HUE(ImageFilter):
             #print('vis_min %d vis_max %d hue_min %d hue_max %d' % (vis_min, vis_max, hue_min, hue_max))
             img_match_h = cv2.inRange(img_hsv[:, :, 0], hue_min, hue_max)
             img_match_v = cv2.inRange(img_hsv[:, :, 2], vis_min, vis_max)
-            img_match = np.minimum(img_match_h, img_match_v)
+            img_match = img_match_h & img_match_v
         return img_match
 
     def __init__(self, hue=None, visibility=None):
@@ -170,6 +175,8 @@ class MM_COLOR_BY_HUE(ImageFilter):
 
 
 class MM_NOT_COLOR_BY_HUE(MM_COLOR_BY_HUE):
+
+    want_grayscale_image = False
 
     def _run_filter(self, img_bgr=None, img_gray=None):
         img_result = super(MM_NOT_COLOR_BY_HUE, self)._run_filter(
